@@ -16,7 +16,7 @@ function callAPi(){
         alert("[open] Connection established");
         console.log("Sending to server");
        
-        socket.send('Hello');
+        //socket.send('Hello');
         socket.addEventListener('message', ev => {
         log(ev.data);
         });

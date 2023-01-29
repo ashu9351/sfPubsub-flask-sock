@@ -38,7 +38,48 @@ def test(sock):
         print("again" , arg)
         
         #time.sleep(5)'''
+
+def auth():
+    authurl = 'https://login.salesforce.com/services/oauth2/token'
+    payload={
+        'grant_type': 'password',
+        'client_id': '3MVG9ZL0ppGP5UrAP59A8.dNkSsWx54hRgtkftFHZh1bxEMSGF6kwnRNA8VheLBe2RHROd01KucH2QHHt5ggh',
+        'client_secret': '22883FEE07FDBA0FD71F317F8A4821155253D7853C280B4302EA229A30B1DDEF',
+        'username': 'ashutoshexams@gmail.com',
+        'password': 'ashutosh9351aozWQvXaav1CPDQaHHgtU7pQy',
+        'organizationId': '00D28000000dVa8EAE'
+    }
+    '''payload = {
+        'grant_type': 'password',
+        'client_id': clientId,
+        'client_secret': clientSecret,
+        'username': username,
+        'password': password,
+    }'''
+    res = requests.post(authurl, 
+        headers={"Content-Type":"application/x-www-form-urlencoded"},
+        data=payload)
+    
+    if res.status_code == 200:
+        response = res.json()
+
+        access_token = response['access_token']
+        instance_url = response['instance_url']
+        access_token = access_token.encode(encoding="ascii",errors="ignore").decode('utf-8')
+        instance_url = instance_url.encode(encoding="ascii",errors="ignore").decode('utf-8')
+        print(access_token)
+        print(instance_url)
+    
         
+    authmetadata = (('accesstoken', access_token),('instanceurl', instance_url),('tenantid', '00D28000000dVa8EAE'))
+    return authmetadata
+
+def publishmessage(decodemsg,sock):
+    message = 'Connected and waiting' if not(decodemsg) else json.loads(json.dumps(decodemsg))
+    print("Got an event!", json.loads(json.dumps(decodemsg)))
+               
+    message = json.dumps(message)
+    sock.send(message)
 
 def call_api(sock):
     semaphore = threading.Semaphore(1)
@@ -52,45 +93,7 @@ def call_api(sock):
     with open(certifi.where(), 'rb') as f:
         creds = grpc.ssl_channel_credentials(f.read())
     with grpc.secure_channel('api.pubsub.salesforce.com:7443', creds) as channel:
-        #GRPC_VERBOSITY=debug
-        GRPC_TRACE=all
-        authurl = 'https://login.salesforce.com/services/oauth2/token'
-        payload={
-            'grant_type': 'password',
-            'client_id': '3MVG9ZL0ppGP5UrAP59A8.dNkSsWx54hRgtkftFHZh1bxEMSGF6kwnRNA8VheLBe2RHROd01KucH2QHHt5ggh',
-            'client_secret': '22883FEE07FDBA0FD71F317F8A4821155253D7853C280B4302EA229A30B1DDEF',
-            'username': 'ashutoshexams@gmail.com',
-            'password': 'ashutosh9351aozWQvXaav1CPDQaHHgtU7pQy',
-            'organizationId': '00D28000000dVa8EAE'
-        }
-        '''payload = {
-            'grant_type': 'password',
-            'client_id': clientId,
-            'client_secret': clientSecret,
-            'username': username,
-            'password': password,
-        }'''
-        res = requests.post(authurl, 
-            headers={"Content-Type":"application/x-www-form-urlencoded"},
-            data=payload)
-        token = ''
-        url= ''
-        if res.status_code == 200:
-            response = res.json()
-
-            access_token = response['access_token']
-            instance_url = response['instance_url']
-            access_token = access_token.encode(encoding="ascii",errors="ignore").decode('utf-8')
-            instance_url = instance_url.encode(encoding="ascii",errors="ignore").decode('utf-8')
-            print(access_token)
-            print(instance_url)
-        token = access_token
-        url = instance_url
-        print("Token is",token);
-        print("url is",url); 
-        
-        authmetadata = (('accesstoken', token),('instanceurl', url),('tenantid', '00D28000000dVa8EAE'))
-
+        authmetadata = auth()
 
         stub = pb2_grpc.PubSubStub(channel)       
         def fetchReqStream(topic):
@@ -124,21 +127,15 @@ def call_api(sock):
                         pb2.SchemaRequest(schema_id=schemaid),
                         metadata=authmetadata).schema_json
                 decoded = decode(schema, payloadbytes)
-                message = 'Connected and waiting' if not(decoded) else json.loads(json.dumps(decoded))
-                print("Got an event!", json.loads(json.dumps(decoded)))
-                fruitname = message['Name__c']
-                fruitprice = message['Price__c']
-                isSubsidised = message['is_Subsidised__c']
-                fruitid = message['Fruit_Id__c']
-                message = json.dumps(message)
-                sock.send(message)
+                publishmessage(decoded,sock)
+               
                 
             else:
                 print("[", time.strftime('%b %d, %Y %l:%M%p %Z'),
                 "] The subscription is active.")
                 latest_replay_id = event.latest_replay_id 
         
-    print('>>>> MAIN API CAlled')
+   
 
 
 @app.route('/')
